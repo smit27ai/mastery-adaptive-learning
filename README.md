@@ -228,6 +228,11 @@ Migrations run in the container entrypoint, not the application lifespan: schema
 must happen once per deploy before any worker serves traffic, rather than racing across
 replicas. The entrypoint also binds `$PORT`, which Railway injects.
 
+`DATABASE_URL` can be wired straight from the provider. Managed Postgres hands out
+`postgres://` or `postgresql://`, and the settings layer rewrites either onto
+`postgresql+asyncpg://` — otherwise the async engine fails at startup with an opaque
+dialect error, in production, on the first deploy.
+
 Required Railway variables:
 
 ```

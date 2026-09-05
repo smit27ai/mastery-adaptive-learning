@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +42,23 @@ class Settings(BaseSettings):
     # Vercel gives every preview deployment its own hostname, so an exact allowlist
     # cannot cover them. This regex opts those in without widening the rule to "*".
     cors_origin_regex: str = ""
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_async_driver(cls, value: str) -> str:
+        """Rewrite a synchronous Postgres URL onto the asyncpg driver.
+
+        Managed providers hand out `postgres://` or `postgresql://`. SQLAlchemy's async
+        engine needs an async driver in the scheme, and the mismatch surfaces as an
+        opaque dialect error at startup, in production, on the first deploy. Normalising
+        here means `DATABASE_URL` can be wired straight from the provider with no manual
+        editing and no chance of the two drifting apart later.
+        """
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+        if value.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + value[len("postgresql://") :]
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:
