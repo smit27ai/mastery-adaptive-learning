@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 PY := python
 
-.PHONY: help setup seed serve dashboard web web-install web-build test lint fmt typecheck check docker-build docker-up docker-down migrate clean
+.PHONY: help setup seed serve dashboard web web-install web-build verify test lint fmt typecheck check docker-build docker-up docker-down migrate clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -29,6 +29,9 @@ web: ## Run the student app on http://localhost:3000
 
 web-build: ## Production build of the student app (typechecks too)
 	cd web && npm run typecheck && npm run build
+
+verify: ## Check a live deployment: make verify URL=https://... [ORIGIN=https://...]
+	$(PY) scripts/verify_deployment.py $(URL) $(if $(ORIGIN),--origin $(ORIGIN),)
 
 test: ## Run the test suite with coverage
 	pytest --cov=mastery --cov-report=term-missing

@@ -255,6 +255,21 @@ NEXT_PUBLIC_API_URL=https://<your-api>.up.railway.app
 The two reference each other, so deploy the API first, then the web app with the API's
 URL, then set `CORS_ORIGINS` to the web app's URL and redeploy the API.
 
+The `Dockerfile` is at the repository root on purpose: Railway, Render and Fly all
+auto-detect it there. Under `docker/` they fall back to their own buildpack and never
+read the build config at all.
+
+After any deploy, check the live service from outside:
+
+```bash
+make verify URL=https://your-api.up.railway.app ORIGIN=https://your-app.vercel.app
+```
+
+It checks liveness, that the database and models are actually up rather than silently
+degraded, that auth rejects what it should, that mastery really moves across a run of
+questions, and that CORS admits your frontend. It exits non-zero, so it can gate a
+release.
+
 ---
 
 ## Datasets
