@@ -1,0 +1,9 @@
+* text=auto
+
+# Shell scripts must keep LF endings. A CRLF entrypoint.sh makes the container die at
+# startup with "bad interpreter: /bin/sh^M" - a Windows-only failure that only shows up
+# once the image runs on Linux.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

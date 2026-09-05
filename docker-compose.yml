@@ -1,0 +1,57 @@
+# Local stack that mirrors production: Postgres + Redis + the API.
+#
+#   docker compose up --build
+#
+# Without this you can still run the API on SQLite with an in-process cache
+# (`make serve`) - this file exists so you can test the real storage layer before
+# deploying, since SQLite hides bugs Postgres will not.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mastery
+      POSTGRES_PASSWORD: mastery
+      POSTGRES_DB: mastery
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mastery"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://mastery:mastery@db:5432/mastery
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: local-development-secret-not-for-production
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8501
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
