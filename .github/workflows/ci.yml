@@ -86,6 +86,26 @@ jobs:
     name: Build image
     runs-on: ubuntu-latest
     needs: [quality]
+
+    # A real Postgres, because the production path - Alembic migrations over asyncpg -
+    # shares almost no code with the SQLite path the unit tests use. Smoke-testing the
+    # image against SQLite proves the image starts; it does not prove the thing that
+    # actually runs in production works.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mastery
+          POSTGRES_PASSWORD: mastery
+          POSTGRES_DB: mastery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mastery"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -102,19 +122,62 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test the image
+      - name: Start the image the way production starts it
         run: |
-          docker run -d --name mastery-ci -p 8000:8000 \
-            -e JWT_SECRET=ci-secret \
-            -e DATABASE_URL=sqlite+aiosqlite:///./ci.db \
+          # DATABASE_URL is deliberately the plain postgresql:// form a managed provider
+          # hands out, so the driver rewrite is exercised rather than bypassed.
+          docker run -d --name mastery-ci --network host \
+            -e APP_ENV=production \
+            -e AUTO_CREATE_SCHEMA=false \
+            -e DATABASE_URL=postgresql://mastery:mastery@localhost:5432/mastery \
+            -e JWT_SECRET=ci-secret-not-used-anywhere-real \
+            -e DEMO_PASSWORD=ci-demo-password \
+            -e SEED_DEMO_DATA=true \
+            -e CORS_ORIGINS=http://localhost:3000 \
             mastery:ci
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/health; then exit 0; fi
+
+          for _ in $(seq 1 45); do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "Container is up."
+              exit 0
+            fi
             sleep 2
           done
-          echo "Container failed to become healthy"
+          echo "::error::Container never became healthy"
           docker logs mastery-ci
           exit 1
+
+      - name: Verify it is actually talking to Postgres
+        run: |
+          set -e
+          # /ready reports each dependency, so a degraded database shows up here rather
+          # than as mysteriously empty responses later.
+          READY=$(curl -fsS http://localhost:8000/ready)
+          echo "$READY"
+          echo "$READY" | grep -q '"database":"ok"'
+          echo "$READY" | grep -q '"ready":true'
+
+      - name: Exercise the learning loop end to end
+        run: |
+          set -e
+          TOKEN=$(curl -fsS -X POST http://localhost:8000/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"ci@test.local","password":"ci-password-123"}' \
+            | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+          QUESTION=$(curl -fsS http://localhost:8000/next-question -H "Authorization: Bearer $TOKEN")
+          echo "$QUESTION"
+          QID=$(echo "$QUESTION" | python -c 'import json,sys; print(json.load(sys.stdin)["question"]["id"])')
+
+          RESULT=$(curl -fsS -X POST http://localhost:8000/submit-answer \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"question_id\": $QID, \"answer\": \"a\", \"response_time_ms\": 5000}")
+          echo "$RESULT"
+          echo "$RESULT" | python -c 'import json,sys; b=json.load(sys.stdin); assert "mastery_after" in b, b'
+
+      - name: Container logs
+        if: always()
+        run: docker logs mastery-ci
 
   # No deploy job here on purpose. Railway and Vercel each build from their own GitHub
   # integration when main moves, so a deploy step in this workflow would either duplicate
