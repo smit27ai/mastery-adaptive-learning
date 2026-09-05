@@ -116,16 +116,7 @@ jobs:
           docker logs mastery-ci
           exit 1
 
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: [quality, web, docker]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      # Replace with your host's action. Railway example shown; the gate above is the
-      # point - nothing reaches production without lint, types, tests and a healthy image.
-      - name: Deploy to Railway
-        run: echo "Configure RAILWAY_TOKEN and run 'railway up' here."
+  # No deploy job here on purpose. Railway and Vercel each build from their own GitHub
+  # integration when main moves, so a deploy step in this workflow would either duplicate
+  # that or - as the placeholder it replaced did - report a successful production
+  # deployment for doing nothing at all.
