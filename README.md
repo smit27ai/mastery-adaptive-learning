@@ -35,7 +35,9 @@ Then open:
 | http://localhost:8000/metrics | Prometheus metrics |
 
 Demo accounts created by the seed: `student@demo.local` / `instructor@demo.local`,
-password `demo12345`.
+password `demo12345` (override with `DEMO_PASSWORD`). In production the seed refuses
+to create these accounts while that password is still the default, so a public
+deployment never ships with credentials that are printed in this file.
 
 Student app (Next.js), in a second terminal:
 
@@ -203,7 +205,49 @@ specific is committed, and `.env` is gitignored.
 | `TARGET_SUCCESS_RATE` | `0.7` | The difficulty the tutor aims the learner at |
 | `EXPLORATION_RATE` | `0.15` | Exploration weight in the bandit |
 | `MODEL_DIR` | `./models/artifacts` | Where `dkt.onnx` is looked up |
+| `AUTO_CREATE_SCHEMA` | `true` | `false` in production - Alembic owns the schema |
+| `DEMO_PASSWORD` | `demo12345` | Must be changed for the seed to run in production |
+| `SEED_DEMO_DATA` | `false` | Set `true` once to load the demo curriculum on deploy |
+| `CORS_ORIGIN_REGEX` | empty | Allows Vercel preview hostnames without widening to `*` |
 | `CORS_ORIGINS` | localhost | Comma-separated allowlist |
+
+---
+
+## Deployment
+
+The API ships as a container; the student app is a static Next.js build.
+
+| Piece | Host | Notes |
+|---|---|---|
+| API | Railway | Builds `docker/Dockerfile`, health check on `/health` |
+| Postgres | Railway plugin | `DATABASE_URL` is injected |
+| Redis | Railway plugin (optional) | Omit it and the app uses its in-process cache |
+| Student app | Vercel | Root directory `web`, `NEXT_PUBLIC_API_URL` points at the API |
+
+Migrations run in the container entrypoint, not the application lifespan: schema changes
+must happen once per deploy before any worker serves traffic, rather than racing across
+replicas. The entrypoint also binds `$PORT`, which Railway injects.
+
+Required Railway variables:
+
+```
+APP_ENV=production
+AUTO_CREATE_SCHEMA=false
+JWT_SECRET=<64 random characters>
+DEMO_PASSWORD=<your own>
+SEED_DEMO_DATA=true          # first deploy only
+CORS_ORIGINS=https://<your-app>.vercel.app
+CORS_ORIGIN_REGEX=^https://<your-project>-[a-z0-9-]+\.vercel\.app$
+```
+
+Required Vercel variable:
+
+```
+NEXT_PUBLIC_API_URL=https://<your-api>.up.railway.app
+```
+
+The two reference each other, so deploy the API first, then the web app with the API's
+URL, then set `CORS_ORIGINS` to the web app's URL and redeploy the API.
 
 ---
 

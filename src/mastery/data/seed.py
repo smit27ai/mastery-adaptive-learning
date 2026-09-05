@@ -14,6 +14,7 @@ import random
 
 from sqlalchemy import func, select
 
+from mastery.common.config import get_settings
 from mastery.common.logging import configure_logging, get_logger
 from mastery.common.security import hash_password
 from mastery.db.base import Concept, Question, User
@@ -94,10 +95,8 @@ QUESTIONS: dict[str, list[tuple[str, list[str], str, float]]] = {
     ],
 }
 
-DEMO_USERS = [
-    ("student@demo.local", "demo12345", "student"),
-    ("instructor@demo.local", "demo12345", "instructor"),
-]
+DEFAULT_DEMO_PASSWORD = "demo12345"
+DEMO_USERS = [("student@demo.local", "student"), ("instructor@demo.local", "instructor")]
 
 
 async def seed() -> None:
@@ -143,8 +142,20 @@ async def seed() -> None:
                 )
                 n_questions += 1
 
-        for email, password, role in DEMO_USERS:
-            db.add(User(email=email, password_hash=hash_password(password), role=role))
+        settings = get_settings()
+        demo_password = settings.demo_password
+        # A public deployment must not ship with the password printed in the README.
+        if settings.is_production and demo_password == DEFAULT_DEMO_PASSWORD:
+            log.warning(
+                "seed.demo_users_skipped",
+                reason="DEMO_PASSWORD is still the documented default; "
+                "set it to seed demo accounts",
+            )
+            seeded_users = 0
+        else:
+            for email, role in DEMO_USERS:
+                db.add(User(email=email, password_hash=hash_password(demo_password), role=role))
+            seeded_users = len(DEMO_USERS)
 
         await db.commit()
 
@@ -152,7 +163,7 @@ async def seed() -> None:
         "seed.complete",
         concepts=len(CONCEPTS),
         questions=n_questions,
-        users=len(DEMO_USERS),
+        users=seeded_users,
     )
 
 

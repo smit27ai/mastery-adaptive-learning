@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # schema and runs once per deploy in the entrypoint, before any worker starts.
     auto_create_schema: bool = True
 
+    # Demo seed. Left at the documented default locally; in production the seed
+    # refuses to create demo accounts unless this is set to something else, so a
+    # public deployment never ships with a password that is printed in the README.
+    demo_password: str = "demo12345"
+
     # Models
     model_version: str = "bkt-v0.1.0"
     model_dir: Path = Path("./models/artifacts")
