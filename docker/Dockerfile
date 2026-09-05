@@ -40,6 +40,10 @@ COPY migrations ./migrations
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# COPY lands as root, so the unprivileged user cannot write anything under /app -
+# including a SQLite file, which is how a local or CI run of this image starts.
+RUN chown -R appuser:appuser /app
+
 # Never run the application as root.
 USER appuser
 
