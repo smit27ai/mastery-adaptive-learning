@@ -1,5 +1,9 @@
 # Multi-stage build: the compiler toolchain never reaches the runtime image.
 # Target is a sub-500MB image, which is what keeps cold starts on free-tier hosts short.
+#
+# This file lives at the repository root deliberately. Railway, Render and Fly all
+# auto-detect a root Dockerfile; with it tucked under docker/ they fall back to their
+# own buildpack (Railway picks Nixpacks) and never read the build config at all.
 
 FROM python:3.11-slim AS builder
 

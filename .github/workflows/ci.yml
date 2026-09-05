@@ -56,7 +56,9 @@ jobs:
         env:
           GITLEAKS_VERSION: 8.30.1
         run: |
-          curl -sSfL             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"             | tar -xz gitleaks
+          url="https://github.com/gitleaks/gitleaks/releases/download"
+          url="$url/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL "$url" | tar -xz gitleaks
           ./gitleaks dir . --no-banner --redact --verbose
 
   web:
@@ -115,7 +117,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/Dockerfile
+          file: Dockerfile
           push: false
           load: true
           tags: mastery:ci

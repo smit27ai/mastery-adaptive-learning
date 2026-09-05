@@ -46,7 +46,7 @@ typecheck: ## Mypy
 check: lint typecheck test ## Everything CI runs
 
 docker-build: ## Build the production image
-	docker build -f docker/Dockerfile -t mastery:local .
+	docker build -t mastery:local .
 
 docker-up: ## Full stack: Postgres + Redis + API
 	docker compose up --build

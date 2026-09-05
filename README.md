@@ -166,7 +166,8 @@ src/mastery/
   services/     the learning loop, testable without HTTP
 tests/          unit + end-to-end API tests
 migrations/     Alembic
-docker/         production Dockerfile
+Dockerfile      production image, at the root so hosts auto-detect it
+docker/         entrypoint script
 ```
 
 ---
@@ -219,7 +220,7 @@ The API ships as a container; the student app is a static Next.js build.
 
 | Piece | Host | Notes |
 |---|---|---|
-| API | Railway | Builds `docker/Dockerfile`, health check on `/health` |
+| API | Railway | Auto-detects the root `Dockerfile`, health check on `/health` |
 | Postgres | Railway plugin | `DATABASE_URL` is injected |
 | Redis | Railway plugin (optional) | Omit it and the app uses its in-process cache |
 | Student app | Vercel | Root directory `web`, `NEXT_PUBLIC_API_URL` points at the API |
